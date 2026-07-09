@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#2E3B4E">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>Ryan &amp; Sara — Lifting</title>
+<script src="config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<style>
+  :root {
+    --navy: #2E3B4E;
+    --navy-light: #4A5D78;
+    --alt-row: #F2F4F7;
+    --border: #D9D9D9;
+    --text: #1A1A1A;
+    --muted: #666666;
+    --accent: #C8843C;
+    --good: #2E7D4F;
+    --bad: #B3403A;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+    color: var(--text);
+    max-width: 880px;
+    margin: 0 auto;
+    padding: 24px 16px 100px;
+    line-height: 1.5;
+    background: #fafbfc;
+  }
+  h1 { color: var(--navy); font-size: 1.7rem; margin: 0 0 2px; }
+  .subtitle { color: var(--muted); font-style: italic; margin: 0 0 10px; font-size: 0.9rem; }
+
+  .sync-chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 0.75rem; font-weight: 600;
+    border-radius: 999px; padding: 4px 12px; margin-bottom: 14px;
+    background: #EAF5EE; color: var(--good);
+  }
+  .sync-chip.offline { background: #FBF3E6; color: var(--accent); }
+  .sync-chip.localonly { background: #F0F0F0; color: var(--muted); }
+  .sync-chip button {
+    border: none; background: none; color: inherit; font-size: 0.72rem;
+    text-decoration: underline; cursor: pointer; padding: 0;
+  }
+
+  .overlay {
+    position: fixed; inset: 0; z-index: 50;
+    background: rgba(46,59,78,0.55);
+    display: flex; align-items: center; justify-content: center;
+    padding: 20px;
+  }
+  .login-card {
+    background: #fff; border-radius: 14px; padding: 26px 24px;
+    max-width: 360px; width: 100%;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.25);
+  }
+  .login-card h2 { margin: 0 0 4px; color: var(--navy); font-size: 1.25rem; }
+  .login-card p { margin: 0 0 16px; font-size: 0.85rem; color: var(--muted); }
+  .login-card label { display: block; font-size: 0.78rem; font-weight: 600; color: var(--navy); margin: 10px 0 3px; }
+  .login-card input {
+    width: 100%; padding: 11px 12px; font-size: 1rem;
+    border: 1px solid var(--border); border-radius: 8px;
+  }
+  .login-card input:focus { outline: 2px solid var(--navy-light); }
+  .login-card .err { color: var(--bad); font-size: 0.8rem; min-height: 1.2em; margin-top: 8px; }
+  .login-card button.primary {
+    width: 100%; margin-top: 14px;
+    background: var(--navy); color: #fff; border: none;
+    padding: 13px; border-radius: 8px; font-size: 1rem; font-weight: 600; cursor: pointer;
+  }
+  .login-card .skip {
+    display: block; text-align: center; margin-top: 12px;
+    font-size: 0.8rem; color: var(--muted); cursor: pointer; text-decoration: underline;
+    background: none; border: none; width: 100%;
+  }
+
+  details.info {
+    background: #fff; border: 1px solid var(--border); border-radius: 8px;
+    padding: 10px 14px; margin-bottom: 16px;
+  }
+  details.info summary { cursor: pointer; font-weight: 600; color: var(--navy); outline: none; }
+  details.info ul { margin: 10px 0 4px; padding-left: 20px; }
+  details.info li { margin-bottom: 6px; font-size: 0.92rem; }
+  details.info h4 { margin: 14px 0 4px; color: var(--navy); font-size: 0.95rem; }
+
+  details.pool {
+    background: #fff; border: 1px dashed var(--border); border-radius: 8px;
+    padding: 8px 14px; margin: 10px 0 18px;
+  }
+  details.pool summary { cursor: pointer; font-size: 0.85rem; color: var(--muted); font-weight: 600; }
+  .pool-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .pool-chip {
+    font-size: 0.78rem; padding: 4px 10px; border-radius: 999px;
+    background: var(--alt-row); color: var(--text); border: 1px solid var(--border);
+  }
+  .pool-chip.selected { background: var(--navy); color: #fff; border-color: var(--navy); }
+
+  .controls { position: sticky; top: 0; z-index: 5; background: #fafbfc; padding: 8px 0 12px; }
+  .tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+  .tab {
+    flex: 1 1 auto; min-width: 62px; text-align: center;
+    padding: 10px 6px; border-radius: 8px;
+    border: 1px solid var(--border); background: #fff;
+    color: var(--navy); font-weight: 600; font-size: 0.85rem;
+    cursor: pointer; user-select: none;
+  }
+  .tab .d { display: block; font-size: 0.7rem; font-weight: 400; color: var(--muted); }
+  .tab.active { background: var(--navy); color: #fff; border-color: var(--navy); }
+  .tab.active .d { color: #cfd8e3; }
+  .tab.today:not(.active) { border-color: var(--accent); }
+
+  .row-controls {
+    display: flex; align-items: center; justify-content: space-between;
+    flex-wrap: wrap; gap: 10px; margin-bottom: 4px;
+  }
+  .person-row, .count-row { display: flex; align-items: center; gap: 8px; }
+  .person-row span.label, .count-row span.label { font-size: 0.82rem; color: var(--muted); }
+  .pill-group { display: flex; border: 1px solid var(--border); border-radius: 999px; overflow: hidden; }
+  .pill { padding: 6px 14px; background: #fff; cursor: pointer; font-size: 0.85rem; font-weight: 600; color: var(--navy); }
+  .pill.active { background: var(--navy); color: #fff; }
+  select#count-select {
+    padding: 6px 10px; border-radius: 999px; border: 1px solid var(--border);
+    font-size: 0.85rem; font-weight: 600; color: var(--navy); background: #fff;
+  }
+
+  .shuffle-row { display: flex; gap: 8px; margin: 10px 0 4px; }
+  button.shuffle-btn {
+    background: #fff; color: var(--navy); border: 1px solid var(--navy);
+    padding: 9px 16px; border-radius: 8px; font-size: 0.88rem; font-weight: 600; cursor: pointer;
+  }
+  button.shuffle-btn:active { background: var(--alt-row); }
+
+  h2.day-title {
+    color: var(--navy); font-size: 1.25rem;
+    border-bottom: 3px solid var(--navy);
+    padding-bottom: 6px; margin: 6px 0 6px;
+  }
+
+  .card {
+    background: #fff; border: 1px solid var(--border); border-radius: 10px;
+    padding: 14px 16px; margin-bottom: 14px; position: relative;
+  }
+  .card .swap-btn {
+    position: absolute; top: 12px; right: 14px;
+    font-size: 0.72rem; color: var(--navy-light);
+    background: none; border: 1px solid var(--border); border-radius: 999px;
+    padding: 4px 10px; cursor: pointer;
+  }
+  .card .swap-btn:hover { background: var(--alt-row); }
+  .card h3 { margin: 0 26px 2px 0; font-size: 1.02rem; }
+  .card h3 a { color: var(--navy-light); text-decoration: none; border-bottom: 1px solid var(--navy-light); }
+  .card h3 a:hover { color: var(--navy); }
+  .card .target { font-size: 0.82rem; color: var(--muted); margin-bottom: 2px; }
+  .card .notes { font-size: 0.82rem; color: var(--muted); font-style: italic; margin-bottom: 10px; }
+  .card .lasttime {
+    font-size: 0.8rem; color: var(--good);
+    background: #EAF5EE; border-radius: 6px;
+    padding: 5px 9px; margin-bottom: 10px; display: inline-block;
+  }
+  .card .lasttime.none { color: var(--muted); background: #F0F0F0; }
+
+  table.log { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+  table.log th { text-align: left; font-weight: 600; color: var(--muted); padding: 4px 6px; font-size: 0.72rem; text-transform: uppercase; }
+  table.log td { padding: 3px 6px; }
+  table.log input {
+    width: 100%; max-width: 90px; padding: 7px 8px;
+    border: 1px solid var(--border); border-radius: 6px; font-size: 0.9rem;
+  }
+  table.log input:focus { outline: 2px solid var(--navy-light); border-color: var(--navy-light); }
+
+  .day-actions { display: flex; gap: 10px; align-items: center; margin: 10px 0 30px; }
+  button.save-btn {
+    background: var(--navy); color: #fff; border: none;
+    padding: 12px 20px; border-radius: 8px; font-size: 0.95rem; font-weight: 600; cursor: pointer;
+  }
+  button.save-btn:active { background: var(--navy-light); }
+  .save-toast { font-size: 0.85rem; color: var(--good); opacity: 0; transition: opacity 0.3s; }
+  .save-toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+  <h1>5-Day Lifting Routine</h1>
+  <p class="subtitle">Each day is a muscle group with a bigger pool of exercises behind it. Every session rotates a handful so things stay fresh.</p>
+  <div class="sync-chip localonly" id="sync-chip"><span id="sync-text">Starting…</span></div>
+
+  <div class="overlay" id="login-overlay" style="display:none;">
+    <div class="login-card">
+      <h2>Sign in</h2>
+      <p>One shared account for you and Sara — sign in once per device and your logs sync everywhere.</p>
+      <label for="email">Email</label>
+      <input type="email" id="email" autocomplete="username" inputmode="email">
+      <label for="password">Password</label>
+      <input type="password" id="password" autocomplete="current-password">
+      <div class="err" id="login-err"></div>
+      <button class="primary" id="login-btn">Sign in</button>
+      <button class="skip" id="skip-btn">Skip — use this device only (no sync)</button>
+    </div>
+  </div>
+
+  <details class="info">
+    <summary>Equipment &amp; how to use this</summary>
+    <h4>Equipment on hand</h4>
+    <ul id="equip-list"></ul>
+    <h4>How to use this</h4>
+    <ul id="usage-list"></ul>
+    <h4>Notes</h4>
+    <ul id="closing-list"></ul>
+  </details>
+
+  <div class="controls">
+    <div class="tabs" id="tabs"></div>
+    <div class="row-controls">
+      <div class="person-row">
+        <span class="label">Logging for:</span>
+        <div class="pill-group" id="person-group">
+          <div class="pill" data-person="Ryan">Ryan</div>
+          <div class="pill" data-person="Sara">Sara</div>
+        </div>
+      </div>
+      <div class="count-row">
+        <span class="label">Exercises today:</span>
+        <select id="count-select">
+          <option value="2">2</option>
+          <option value="3">3</option>
+          <option value="4">4</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <div id="day-content"></div>
+
+  <div class="shuffle-row">
+    <button class="shuffle-btn" id="shuffle-btn">🔀 Shuffle today's picks</button>
+  </div>
+
+  <details class="pool" id="pool-details">
+    <summary>Full exercise pool for this day (click Shuffle above to rotate, or the swap icon on a card)</summary>
+    <div class="pool-chips" id="pool-chips"></div>
+  </details>
+
+  <div class="day-actions">
+    <button class="save-btn" id="save-btn">Save today's numbers</button>
+    <span class="save-toast" id="toast">Saved ✓</span>
+  </div>
+
+<script>
+  const DAYS = [{"num":1,"name":"Monday","focus":"Chest","exercises":[{"name":"Flat DB Bench Press","url":"https://www.muscleandstrength.com/exercises/dumbbell-bench-press.html","setsReps":"4 x 10-12","sets":4,"equip":"db","ryan":"15","sara":"10-12","notes":"Bench flat, feet planted"},{"name":"Incline DB Press","url":"https://www.muscleandstrength.com/exercises/incline-dumbbell-bench-press.html","setsReps":"3 x 10-12","sets":3,"equip":"db","ryan":"12-15","sara":"8-10","notes":"Bench at 30-45°"},{"name":"DB Chest Fly","url":"https://www.healthline.com/health/exercise-fitness/dumbbell-chest-fly","setsReps":"3 x 12-15","sets":3,"equip":"db","ryan":"10-12","sara":"8","notes":"Flat or slight incline, slow stretch at bottom"},{"name":"Bosu Push-Up","url":"https://www.muscleandstrength.com/exercises/bosu-ball-push-up","setsReps":"3 x AMRAP","sets":3,"equip":"bw","ryan":"","sara":"knees ok","notes":"Hands on Bosu dome for instability"},{"name":"Feet-Elevated (Decline) Push-Up","url":"https://www.muscleandstrength.com/exercises/decline-push-up.html","setsReps":"3 x AMRAP","sets":3,"equip":"bw","ryan":"","sara":"knees ok","notes":"Feet up on bench, hands on floor — targets lower/mid chest like your old decline dip"},{"name":"Band Standing Chest Press","url":"https://fitbod.me/exercises/loop-band-standing-chest-press","setsReps":"3 x 12-15","sets":3,"equip":"band","ryan":"Medium","sara":"Light-Medium","notes":"Anchor band behind you at chest height"},{"name":"Band Standing Chest Fly (Cross-Over)","url":"https://www.strengthlog.com/standing-resistance-band-chest-fly/","setsReps":"3 x 12-15","sets":3,"equip":"band","ryan":"Medium","sara":"Light","notes":"Anchor behind you, wide arc, squeeze at the front"},{"name":"DB Wide-Grip Floor Press","url":"https://www.muscleandstrength.com/exercises/dumbbell-floor-press.html","setsReps":"3 x 10-12","sets":3,"equip":"db","ryan":"15","sara":"10","notes":"Lie on floor, elbows out slightly wider than bench press"}],"subNote":"Pick 2-4 of the above per session (or hit Shuffle) — don't do all of them every time."},{"num":2,"name":"Tuesday","focus":"Back","exercises":[{"name":"Single-Arm DB Row","url":"https://www.acefitness.org/resources/everyone/exercise-library/126/single-arm-row/","setsReps":"4 x 10-12/side","sets":4,"equip":"db","ryan":"15","sara":"10-12","notes":"Bench-supported, flat back"},{"name":"Band Lat Pulldown","url":"https://www.hevyapp.com/exercises/lat-pulldown-band/","setsReps":"3 x 12-15","sets":3,"equip":"band","ryan":"Heavy","sara":"Medium","notes":"Anchor overhead (door anchor)"},{"name":"Band Wide-Grip Pulldown","url":"https://gym-mikolo.com/blogs/home-gym/the-ultimate-guide-to-lat-pulldowns-with-resistance-bands","setsReps":"3 x 12-15","sets":3,"equip":"band","ryan":"Heavy","sara":"Medium","notes":"Wider hand placement than the regular band pulldown — hits lats wider/lower"},{"name":"Band Seated Row","url":"https://www.healthline.com/health/resistance-band-row-exercise","setsReps":"3 x 12-15","sets":3,"equip":"band","ryan":"Heavy","sara":"Medium","notes":"Band around feet, sit tall"},{"name":"Chest-Supported DB Row","url":"https://fitbod.me/exercises/chest-supported-dumbbell-row","setsReps":"3 x 10-12","sets":3,"equip":"db","ryan":"15","sara":"10-12","notes":"Chest on an inclined bench, row both dumbbells — your old chest-supported seated row"},{"name":"DB Romanian Deadlift","url":"https://fitbod.me/exercises/dumbbell-romanian-deadlift","setsReps":"3 x 10-12","sets":3,"equip":"db","ryan":"15","sara":"10-12","notes":"Soft knees, hinge at hips"},{"name":"Bosu Superman","url":"https://gofitify.com/exercises/bosu/superman","setsReps":"3 x 12-15","sets":3,"equip":"bw","ryan":"","sara":"","notes":"Lie prone over Bosu, lift chest + legs — lower back/erectors"},{"name":"Band Pull-Apart","url":"https://www.muscleandstrength.com/exercises/band-pull-apart","setsReps":"3 x 15-20","sets":3,"equip":"band","ryan":"Light-Medium","sara":"Light","notes":"Rear delt / upper back, arms straight"}],"subNote":"Pick 2-4 of the above per session (or hit Shuffle) — don't do all of them every time."},{"num":3,"name":"Wednesday","focus":"Shoulders","exercises":[{"name":"Seated DB Shoulder Press","url":"https://www.muscleandstrength.com/exercises/seated-dumbbell-press.html","setsReps":"4 x 10-12","sets":4,"equip":"db","ryan":"12-15","sara":"8-10","notes":"Seated on bench, back supported"},{"name":"DB Arnold Press","url":"https://www.muscleandstrength.com/exercises/arnold-press.html","setsReps":"3 x 10-12","sets":3,"equip":"db","ryan":"10-12","sara":"8","notes":"Rotate palms in to out as you press — hits more of the front/side delt"},{"name":"DB Front Raise","url":"https://www.muscleandstrength.com/exercises/dumbbell-front-raise.html","setsReps":"3 x 12","sets":3,"equip":"db","ryan":"8-10","sara":"8","notes":"Controlled, no swinging"},{"name":"DB Lateral Raise","url":"https://www.muscleandstrength.com/exercises/dumbbell-lateral-raise.html","setsReps":"3 x 12-15","sets":3,"equip":"db","ryan":"8-10","sara":"8","notes":"Slight bend in elbow, lead with elbows"},{"name":"Band Lateral Raise","url":"https://www.hevyapp.com/exercises/how-to-lateral-raise-band/","setsReps":"3 x 12-15","sets":3,"equip":"band","ryan":"Medium","sara":"Light-Medium","notes":"Band adds most resistance at the top — good change-up from DB laterals"},{"name":"Band Upright Row","url":"https://www.muscleandstrength.com/exercises/banded-upright-row","setsReps":"3 x 12-15","sets":3,"equip":"band","ryan":"Medium","sara":"Light-Medium","notes":"Stand on band, pull to chin"},{"name":"Band Face Pull","url":"https://www.muscleandstrength.com/exercises/banded-face-pull","setsReps":"3 x 15","sets":3,"equip":"band","ryan":"Light-Medium","sara":"Light","notes":"Anchor at chest height, pull to face"}],"subNote":"Pick 2-4 of the above per session (or hit Shuffle) — don't do all of them every time."},{"num":4,"name":"Thursday","focus":"Arms","exercises":[{"name":"DB Hammer Curl","url":"https://www.muscleandstrength.com/exercises/standing-hammer-curl.html","setsReps":"3 x 10-12","sets":3,"equip":"db","ryan":"15","sara":"10","notes":"Neutral grip, elbows pinned"},{"name":"DB Seated Bicep Curl","url":"https://www.acefitness.org/resources/everyone/exercise-library/44/seated-biceps-curl/","setsReps":"3 x 10-12","sets":3,"equip":"db","ryan":"12-15","sara":"10-12","notes":"Seated on bench, strict form"},{"name":"DB Concentration Curl","url":"https://www.muscleandstrength.com/exercises/concentration-curl.html","setsReps":"3 x 8-10/side","sets":3,"equip":"db","ryan":"12-15","sara":"8-10","notes":"Elbow braced on inner thigh — your old \"inside bicep\" seated curl"},{"name":"Bench Tricep Dips","url":"https://www.muscleandstrength.com/exercises/tricep-bench-dip.html","setsReps":"3 x 15","sets":3,"equip":"bw","ryan":"","sara":"bent knees","notes":"Hands on bench edge, feet out for difficulty"},{"name":"DB Overhead Tricep Extension","url":"https://www.muscleandstrength.com/exercises/two-arm-dumbbell-extension.html","setsReps":"3 x 10-12","sets":3,"equip":"db","ryan":"12-15","sara":"10","notes":"Single DB, both hands, seated or standing"},{"name":"DB Skull Crusher","url":"https://www.muscleandstrength.com/exercises/lying-tricep-extension.html","setsReps":"3 x 10-12","sets":3,"equip":"db","ryan":"10-12","sara":"8","notes":"Lying on bench, lower to forehead, elbows fixed"},{"name":"Band Bicep Curl","url":"https://workoutlabs.com/exercise-guide/resistance-band-bicep-curls/","setsReps":"2 x 15-20","sets":2,"equip":"band","ryan":"Medium","sara":"Light-Medium","notes":"Stand on band"},{"name":"Band Tricep Pushdown","url":"https://hortonbarbell.com/band-tricep-pushdown/","setsReps":"2 x 15-20","sets":2,"equip":"band","ryan":"Medium","sara":"Light-Medium","notes":"Anchor overhead"}],"subNote":"Pick 2-4 of the above per session (or hit Shuffle) — don't do all of them every time."},{"num":5,"name":"Friday","focus":"Legs","exercises":[{"name":"DB Goblet Squat","url":"https://www.muscleandstrength.com/exercises/dumbbell-goblet-squat","setsReps":"4 x 12-15","sets":4,"equip":"db","ryan":"15","sara":"10-12","notes":"Hold one DB with both hands at chest, elbows inside knees at bottom"},{"name":"Bosu Squat","url":"https://musclewiki.com/exercise/bosu-ball-squat","setsReps":"3 x 12-15","sets":3,"equip":"bw","ryan":"","sara":"","notes":"Stand on Bosu dome, control the wobble — hold a light dumbbell at your chest once bodyweight feels easy"},{"name":"DB Bulgarian Split Squat","url":"https://www.muscleandstrength.com/exercises/one-leg-dumbbell-squat-aka-bulgarian-squat.html","setsReps":"3 x 10/leg","sets":3,"equip":"db","ryan":"12-15","sara":"8-10","notes":"Rear foot up on bench"},{"name":"DB Romanian Deadlift","url":"https://fitbod.me/exercises/dumbbell-romanian-deadlift","setsReps":"3 x 10-12","sets":3,"equip":"db","ryan":"15","sara":"10-12","notes":"Same cue as back day — hinge, don’t round"},{"name":"DB Single-Leg RDL","url":"https://fitbod.me/exercises/single-leg-romanian-deadlift","setsReps":"3 x 8-10/leg","sets":3,"equip":"db","ryan":"10-12","sara":"8","notes":"Balance-heavy — hold bench for support if needed"},{"name":"DB Curtsy Lunge","url":"https://fitbod.me/exercises/dumbbell-curtsy-lunge","setsReps":"3 x 10/leg","sets":3,"equip":"db","ryan":"10-12","sara":"8","notes":"Step back and across — hits glute medius/outer hip"},{"name":"Band Walking Lunges","url":"https://fitwill.app/exercise/7110/resistance-band-walking-lunge/","setsReps":"3 x 10/leg","sets":3,"equip":"band","ryan":"Medium","sara":"Light","notes":"Short, controlled steps — bodyweight only is fine if you don't have a band handy"},{"name":"Band Lateral Walk / Clamshell","url":"https://spotebi.com/exercise-guide/lateral-band-walk/","setsReps":"2 x 15/side","sets":2,"equip":"band","ryan":"Medium","sara":"Light-Medium","notes":"Glute activation — band around ankles or knees"},{"name":"DB Hip Thrust (feet on bench or Bosu)","url":"https://fitbod.me/exercises/dumbbell-hip-thrust","setsReps":"3 x 12-15","sets":3,"equip":"db","ryan":"15","sara":"10-12","notes":"Rest one dumbbell across your hips, shoulders on bench, drive through heels"}],"subNote":"Pick 2-4 of the above per session (or hit Shuffle) — don't do all of them every time."}];
+  const EQUIPMENT = ["Flat/adjustable weight bench","Dumbbells: 8, 10, 12, 15 lb (pairs)","Bosu ball","Resistance bands (light/medium/heavy)"];
+  const USAGE = ["This is a rotating pool, not a fixed checklist — each session, pick (or let the HTML tool randomly choose) 2-4 exercises from that day's muscle group list rather than doing all of them. That's how the original gym sessions worked too.","Rotating combinations keeps the muscle group fresh from week to week and hits it from different angles instead of grinding the same 5 moves forever.","Rest 60–90 sec between sets on isolation moves, 90–120 sec on the big compound lifts (squats, presses, rows).","Progression: once you complete every set at the TOP of the rep range with clean form, move up — next dumbbell size, a heavier band, or add 2–3 reps per set.","Dumbbells top out at 15 lb per hand — once 15s stop being challenging at 12+ reps, add a slow 3-second lowering tempo, a pause at the bottom, or layer a band for extra resistance before you need heavier dumbbells.","The Bosu ball is your stability tool — use it to make squats, push-ups, and hip work harder without adding weight.","“Ryan” and “Sara” suggestions are starting points pulled from your training logs — adjust up or down in the first week or two as needed.","Every exercise name below links to a form guide — click before your first session with a new move."];
+  const CLOSING = ["This mirrors the muscle groups and movement patterns from your gym sessions (with Leyon) — machine rows, lat pulldowns, and leg-press work have been swapped for dumbbell, band, and Bosu equivalents you can do at home.","If you get back to a full gym, the same day structure carries over directly — just sub back in the machines (seated row, lat pulldown, leg press, leg extension/curl).","Warm up 5 minutes light cardio + a couple bodyweight sets of the first exercise before loading up each day."];
+
+  const LOG_KEY = "liftLog_v2";
+  const PERSON_KEY = "liftLog_person";
+  const SELECTION_KEY = "liftSelection_v1";
+  const COUNT_KEY = "liftLog_count";
+  const PENDING_KEY = "liftPending_v1";
+  const SKIP_LOGIN_KEY = "liftSkipLogin";
+
+  // ---------- Supabase setup ----------
+  const CFG = window.WORKOUT_CONFIG || {};
+  const hasCloudConfig = !!(CFG.SUPABASE_URL && CFG.SUPABASE_ANON_KEY);
+  let sb = null;
+  let session = null;
+  if (hasCloudConfig && window.supabase) {
+    sb = window.supabase.createClient(CFG.SUPABASE_URL, CFG.SUPABASE_ANON_KEY);
+  }
+
+  function setSyncChip(state, text) {
+    const chip = document.getElementById("sync-chip");
+    const t = document.getElementById("sync-text");
+    chip.classList.remove("offline", "localonly");
+    if (state === "synced") { t.textContent = text || "Cloud: synced ✓"; }
+    else if (state === "offline") { chip.classList.add("offline"); t.textContent = text || "Cloud: offline — will sync when back online"; }
+    else { chip.classList.add("localonly"); t.textContent = text || "Local only (no cloud sync)"; }
+    let btn = chip.querySelector("button");
+    if (btn) btn.remove();
+    if (session) {
+      btn = document.createElement("button");
+      btn.textContent = "sign out";
+      btn.onclick = async () => { await sb.auth.signOut(); location.reload(); };
+      chip.appendChild(btn);
+    } else if (hasCloudConfig && localStorage.getItem(SKIP_LOGIN_KEY)) {
+      btn = document.createElement("button");
+      btn.textContent = "sign in";
+      btn.onclick = () => { localStorage.removeItem(SKIP_LOGIN_KEY); showLogin(); };
+      chip.appendChild(btn);
+    }
+  }
+
+  function showLogin() { document.getElementById("login-overlay").style.display = "flex"; }
+  function hideLogin() { document.getElementById("login-overlay").style.display = "none"; }
+
+  // ---------- local storage helpers ----------
+  function loadLog() {
+    try { return JSON.parse(localStorage.getItem(LOG_KEY)) || {}; }
+    catch (e) { return {}; }
+  }
+  function saveLog(log) { localStorage.setItem(LOG_KEY, JSON.stringify(log)); }
+  function loadSelections() {
+    try { return JSON.parse(localStorage.getItem(SELECTION_KEY)) || {}; }
+    catch (e) { return {}; }
+  }
+  function saveSelections(sel) { localStorage.setItem(SELECTION_KEY, JSON.stringify(sel)); }
+  function loadPending() {
+    try { return JSON.parse(localStorage.getItem(PENDING_KEY)) || []; }
+    catch (e) { return []; }
+  }
+  function savePending(p) { localStorage.setItem(PENDING_KEY, JSON.stringify(p)); }
+
+  function todayISO() {
+    const d = new Date();
+    return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0");
+  }
+  function daysBetween(iso) {
+    if (!iso) return Infinity;
+    const then = new Date(iso + "T00:00:00");
+    const now = new Date(todayISO() + "T00:00:00");
+    return Math.round((now - then) / 86400000);
+  }
+  function logKey(exName, person) { return exName + "||" + person; }
+
+  // ---------- cloud sync ----------
+  function upsertLocalEntry(log, person, exercise, date, sets) {
+    const key = logKey(exercise, person);
+    const arr = log[key] || [];
+    const idx = arr.findIndex(e => e.date === date);
+    const entry = { date, sets };
+    if (idx >= 0) arr[idx] = entry;
+    else {
+      arr.push(entry);
+      arr.sort((a, b) => b.date.localeCompare(a.date));
+    }
+    log[key] = arr.slice(0, 50);
+  }
+
+  async function pullAll() {
+    if (!sb || !session) return;
+    try {
+      const { data, error } = await sb.from("workout_logs")
+        .select("person, exercise, date, sets")
+        .order("date", { ascending: false })
+        .limit(2000);
+      if (error) throw error;
+      const log = loadLog();
+      const pending = loadPending();
+      const pendingKeys = new Set(pending.map(p => p.person + "||" + p.exercise + "||" + p.date));
+      data.forEach(row => {
+        if (pendingKeys.has(row.person + "||" + row.exercise + "||" + row.date)) return;
+        upsertLocalEntry(log, row.person, row.exercise, row.date, row.sets);
+      });
+      saveLog(log);
+      setSyncChip("synced");
+    } catch (e) {
+      setSyncChip("offline");
+    }
+  }
+
+  async function pushEntries(entries) {
+    if (!sb || !session || !entries.length) return false;
+    try {
+      const rows = entries.map(en => ({
+        user_id: session.user.id,
+        person: en.person,
+        exercise: en.exercise,
+        date: en.date,
+        sets: en.sets,
+        updated_at: new Date().toISOString()
+      }));
+      const { error } = await sb.from("workout_logs")
+        .upsert(rows, { onConflict: "user_id,person,exercise,date" });
+      if (error) throw error;
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  async function flushPending() {
+    if (!sb || !session) return;
+    const pending = loadPending();
+    if (!pending.length) { setSyncChip("synced"); return; }
+    const log = loadLog();
+    const entries = pending.map(p => {
+      const arr = log[logKey(p.exercise, p.person)] || [];
+      const entry = arr.find(e => e.date === p.date);
+      return entry ? { person: p.person, exercise: p.exercise, date: p.date, sets: entry.sets } : null;
+    }).filter(Boolean);
+    const ok = await pushEntries(entries);
+    if (ok) { savePending([]); setSyncChip("synced"); }
+    else setSyncChip("offline");
+  }
+
+  // ---------- day/rotation state ----------
+  const jsDay = new Date().getDay();
+  let currentDayNum = (jsDay >= 1 && jsDay <= 5) ? jsDay : 1;
+  let currentPerson = localStorage.getItem(PERSON_KEY) || "Ryan";
+  let currentCount = parseInt(localStorage.getItem(COUNT_KEY), 10) || 3;
+
+  function lastTrainedDaysAgo(exName) {
+    const log = loadLog();
+    let best = Infinity;
+    ["Ryan", "Sara"].forEach(p => {
+      const arr = log[logKey(exName, p)];
+      if (arr && arr.length) {
+        const d = daysBetween(arr[0].date);
+        if (d < best) best = d;
+      }
+    });
+    return best;
+  }
+
+  function shuffleArray(arr) {
+    const a = arr.slice();
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  }
+
+  function pickExercises(pool, count, exclude) {
+    exclude = exclude || [];
+    const candidates = pool.filter(e => exclude.indexOf(e.name) === -1);
+    const withScore = candidates.map(e => ({ e, score: lastTrainedDaysAgo(e.name) + Math.random() * 0.5 }));
+    withScore.sort((a, b) => b.score - a.score);
+    const poolSize = Math.min(withScore.length, count + 1);
+    const topSlice = shuffleArray(withScore.slice(0, poolSize));
+    return topSlice.slice(0, count).map(x => x.e);
+  }
+
+  function getOrCreateSelection(day) {
+    const selections = loadSelections();
+    const key = String(day.num);
+    const today = todayISO();
+    const existing = selections[key];
+    if (existing && existing.date === today && existing.count === currentCount) {
+      return existing.exercises;
+    }
+    const picked = pickExercises(day.exercises, currentCount, existing ? existing.exercises : []);
+    const names = picked.map(e => e.name);
+    selections[key] = { date: today, count: currentCount, exercises: names };
+    saveSelections(selections);
+    return names;
+  }
+
+  function reshuffle(day) {
+    const selections = loadSelections();
+    const key = String(day.num);
+    const existing = selections[key];
+    const picked = pickExercises(day.exercises, currentCount, existing ? existing.exercises : []);
+    const names = picked.map(e => e.name);
+    selections[key] = { date: todayISO(), count: currentCount, exercises: names };
+    saveSelections(selections);
+    return names;
+  }
+
+  function swapOne(day, oldName) {
+    const selections = loadSelections();
+    const key = String(day.num);
+    const existing = selections[key] || { exercises: [] };
+    const currentNames = existing.exercises;
+    const replacement = pickExercises(day.exercises, 1, currentNames)[0];
+    if (!replacement) return currentNames;
+    const newNames = currentNames.map(n => n === oldName ? replacement.name : n);
+    selections[key] = { date: todayISO(), count: currentCount, exercises: newNames };
+    saveSelections(selections);
+    return newNames;
+  }
+
+  // ---------- display helpers ----------
+  function formatSuggestion(ex, person) {
+    const value = person === "Sara" ? ex.sara : ex.ryan;
+    if (ex.equip === "db") return "Dumbbells - " + (value || "-") + "lbs";
+    if (ex.equip === "band") return "Band - " + (value || "-");
+    return value ? "Bodyweight (" + value + ")" : "Bodyweight";
+  }
+  function plainValue(ex, person) {
+    const value = person === "Sara" ? ex.sara : ex.ryan;
+    return value || (ex.equip === "bw" ? "BW" : "");
+  }
+  function genericPlaceholder(ex) {
+    if (ex.equip === "band") return "band";
+    if (ex.equip === "bw") return "BW";
+    return "wt";
+  }
+
+  function lastEntryFor(exName, person) {
+    const log = loadLog();
+    const arr = log[logKey(exName, person)];
+    if (!arr || !arr.length) return null;
+    return arr[0];
+  }
+  function formatLastTime(entry) {
+    if (!entry) return null;
+    const parts = entry.sets.map(s => {
+      if (!s.weight && !s.reps) return null;
+      return (s.weight || "-") + " x " + (s.reps || "-");
+    }).filter(Boolean);
+    if (!parts.length) return null;
+    return entry.date + ": " + parts.join(", ");
+  }
+
+  // ---------- rendering ----------
+  function fillInfo() {
+    document.getElementById("equip-list").innerHTML = EQUIPMENT.map(t => "<li>" + t + "</li>").join("");
+    document.getElementById("usage-list").innerHTML = USAGE.map(t => "<li>" + t + "</li>").join("");
+    document.getElementById("closing-list").innerHTML = CLOSING.map(t => "<li>" + t + "</li>").join("");
+  }
+
+  function renderTabs() {
+    const tabsEl = document.getElementById("tabs");
+    tabsEl.innerHTML = DAYS.map(d => {
+      const isActive = d.num === currentDayNum;
+      const isToday = d.num === jsDay;
+      return '<div class="tab' + (isActive ? ' active' : '') + (isToday ? ' today' : '') + '" data-day="' + d.num + '">' +
+        d.name + '<span class="d">' + d.focus + (isToday ? ' • today' : '') + '</span></div>';
+    }).join("");
+    tabsEl.querySelectorAll(".tab").forEach(el => {
+      el.addEventListener("click", () => {
+        currentDayNum = parseInt(el.dataset.day, 10);
+        renderTabs();
+        renderDay();
+      });
+    });
+  }
+
+  function renderPersonPills() {
+    document.querySelectorAll(".pill").forEach(el => {
+      el.classList.toggle("active", el.dataset.person === currentPerson);
+      el.onclick = () => {
+        currentPerson = el.dataset.person;
+        localStorage.setItem(PERSON_KEY, currentPerson);
+        renderPersonPills();
+        renderDay();
+      };
+    });
+  }
+
+  function setupCountSelect() {
+    const sel = document.getElementById("count-select");
+    sel.value = String(currentCount);
+    sel.addEventListener("change", () => {
+      currentCount = parseInt(sel.value, 10);
+      localStorage.setItem(COUNT_KEY, String(currentCount));
+      renderDay();
+    });
+  }
+
+  function renderPoolChips(day, selectedNames) {
+    const chipsEl = document.getElementById("pool-chips");
+    chipsEl.innerHTML = day.exercises.map(e => {
+      const sel = selectedNames.indexOf(e.name) !== -1;
+      return '<span class="pool-chip' + (sel ? ' selected' : '') + '">' + e.name + '</span>';
+    }).join("");
+  }
+
+  function renderDay() {
+    const day = DAYS.find(d => d.num === currentDayNum);
+    const selectedNames = getOrCreateSelection(day);
+    const container = document.getElementById("day-content");
+    let html = '<h2 class="day-title">Day ' + day.num + ' — ' + day.name + ': ' + day.focus + '</h2>';
+
+    const selectedExercises = selectedNames.map(n => day.exercises.find(e => e.name === n)).filter(Boolean);
+
+    selectedExercises.forEach((ex, exIdx) => {
+      const last = lastEntryFor(ex.name, currentPerson);
+      const lastStr = formatLastTime(last);
+      const suggestedLabel = formatSuggestion(ex, currentPerson);
+      const suggestedPlain = plainValue(ex, currentPerson);
+      const genericPh = genericPlaceholder(ex);
+
+      let rows = "";
+      for (let i = 0; i < ex.sets; i++) {
+        const prevSet = last && last.sets[i] ? last.sets[i] : null;
+        const wVal = prevSet ? prevSet.weight : "";
+        const rVal = prevSet ? prevSet.reps : "";
+        rows += '<tr>' +
+          '<td>Set ' + (i+1) + '</td>' +
+          '<td><input type="text" inputmode="decimal" data-ex="' + exIdx + '" data-set="' + i + '" data-field="weight" value="' + wVal + '" placeholder="' + (i===0 ? suggestedPlain : genericPh) + '"></td>' +
+          '<td><input type="text" inputmode="numeric" data-ex="' + exIdx + '" data-set="' + i + '" data-field="reps" value="' + rVal + '" placeholder="reps"></td>' +
+          '</tr>';
+      }
+
+      html += '<div class="card" data-ex-name="' + encodeURIComponent(ex.name) + '">' +
+        '<button class="swap-btn" data-swap="' + encodeURIComponent(ex.name) + '">🔀 swap</button>' +
+        '<h3><a href="' + ex.url + '" target="_blank" rel="noopener">' + ex.name + '</a></h3>' +
+        '<div class="target">Target: ' + ex.setsReps + ' &middot; Suggested: ' + suggestedLabel + '</div>' +
+        '<div class="notes">' + ex.notes + '</div>' +
+        (lastStr
+          ? '<div class="lasttime">Last time (' + currentPerson + '): ' + lastStr + '</div>'
+          : '<div class="lasttime none">No logged history yet for ' + currentPerson + '</div>') +
+        '<table class="log"><thead><tr><th></th><th>Weight / Band</th><th>Reps</th></tr></thead><tbody>' + rows + '</tbody></table>' +
+        '</div>';
+    });
+
+    if (day.subNote) {
+      html += '<div class="notes" style="margin: -6px 0 16px; font-size: 0.82rem; color: var(--muted); font-style: italic;">' + day.subNote + '</div>';
+    }
+
+    container.innerHTML = html;
+
+    container.querySelectorAll(".swap-btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const oldName = decodeURIComponent(btn.dataset.swap);
+        swapOne(day, oldName);
+        renderDay();
+      });
+    });
+
+    renderPoolChips(day, selectedNames);
+  }
+
+  // ---------- save ----------
+  async function saveToday() {
+    const day = DAYS.find(d => d.num === currentDayNum);
+    const log = loadLog();
+    const date = todayISO();
+    const changed = [];
+
+    document.querySelectorAll(".card").forEach(card => {
+      const exName = decodeURIComponent(card.dataset.exName);
+      const exObj = day.exercises.find(e => e.name === exName);
+      if (!exObj) return;
+      const sets = [];
+      let hasAny = false;
+      for (let i = 0; i < exObj.sets; i++) {
+        const wEl = card.querySelector('input[data-set="' + i + '"][data-field="weight"]');
+        const rEl = card.querySelector('input[data-set="' + i + '"][data-field="reps"]');
+        const weight = wEl ? wEl.value.trim() : "";
+        const reps = rEl ? rEl.value.trim() : "";
+        if (weight || reps) hasAny = true;
+        sets.push({ weight, reps });
+      }
+      if (!hasAny) return;
+      upsertLocalEntry(log, currentPerson, exName, date, sets);
+      changed.push({ person: currentPerson, exercise: exName, date, sets });
+    });
+
+    saveLog(log);
+
+    if (changed.length && sb && session) {
+      const ok = await pushEntries(changed);
+      if (!ok) {
+        const pending = loadPending();
+        changed.forEach(c => {
+          if (!pending.some(p => p.person === c.person && p.exercise === c.exercise && p.date === c.date)) {
+            pending.push({ person: c.person, exercise: c.exercise, date: c.date });
+          }
+        });
+        savePending(pending);
+        setSyncChip("offline");
+      } else {
+        await flushPending();
+      }
+    } else if (changed.length && hasCloudConfig && !session) {
+      const pending = loadPending();
+      changed.forEach(c => {
+        if (!pending.some(p => p.person === c.person && p.exercise === c.exercise && p.date === c.date)) {
+          pending.push({ person: c.person, exercise: c.exercise, date: c.date });
+        }
+      });
+      savePending(pending);
+    }
+
+    renderDay();
+    const toast = document.getElementById("toast");
+    toast.classList.add("show");
+    setTimeout(() => toast.classList.remove("show"), 1800);
+  }
+
+  // ---------- auth flow ----------
+  async function initAuth() {
+    if (!hasCloudConfig || !sb) {
+      setSyncChip("localonly", "Local only (cloud not configured)");
+      return;
+    }
+    const { data } = await sb.auth.getSession();
+    session = data.session;
+    if (session) {
+      hideLogin();
+      setSyncChip("synced", "Cloud: connected");
+      await pullAll();
+      await flushPending();
+      renderDay();
+    } else if (!localStorage.getItem(SKIP_LOGIN_KEY)) {
+      showLogin();
+      setSyncChip("localonly", "Not signed in");
+    } else {
+      setSyncChip("localonly", "Local only (skipped sign-in)");
+    }
+  }
+
+  document.getElementById("login-btn").addEventListener("click", async () => {
+    const email = document.getElementById("email").value.trim();
+    const password = document.getElementById("password").value;
+    const errEl = document.getElementById("login-err");
+    errEl.textContent = "";
+    if (!email || !password) { errEl.textContent = "Enter email and password."; return; }
+    const { data, error } = await sb.auth.signInWithPassword({ email, password });
+    if (error) { errEl.textContent = error.message; return; }
+    session = data.session;
+    hideLogin();
+    setSyncChip("synced", "Cloud: connected");
+    await pullAll();
+    await flushPending();
+    renderDay();
+  });
+
+  document.getElementById("skip-btn").addEventListener("click", () => {
+    localStorage.setItem(SKIP_LOGIN_KEY, "1");
+    hideLogin();
+    setSyncChip("localonly", "Local only (skipped sign-in)");
+  });
+
+  document.getElementById("save-btn").addEventListener("click", saveToday);
+  document.getElementById("shuffle-btn").addEventListener("click", () => {
+    const day = DAYS.find(d => d.num === currentDayNum);
+    reshuffle(day);
+    renderDay();
+  });
+
+  window.addEventListener("online", () => { if (session) flushPending(); });
+
+  // ---------- boot ----------
+  fillInfo();
+  renderTabs();
+  renderPersonPills();
+  setupCountSelect();
+  renderDay();
+  initAuth();
+
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("sw.js").catch(() => {});
+  }
+</script>
+</body>
+</html>
