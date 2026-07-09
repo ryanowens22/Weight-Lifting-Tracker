@@ -1,6 +1,6 @@
-// Paste your Supabase project values here (see README step 2).
-// The app works in "Local only" mode until you fill these in.
+// Supabase project config. The publishable key is safe to expose publicly —
+// data access is protected by Row Level Security + the app login.
 window.WORKOUT_CONFIG = {
-  SUPABASE_URL: "",       // e.g. "https://abcdefgh.supabase.co"
-  SUPABASE_ANON_KEY: ""   // the long "anon public" key
+  SUPABASE_URL: "https://zigzmttbhideuujnwpxm.supabase.co",
+  SUPABASE_ANON_KEY: "sb_publishable_PRBqihbG9YKrG_QpSTjhNg_z7qTpWYL"
 };
