@@ -2,8 +2,11 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#2E3B4E">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon-192.png">
 <title>Ryan &amp; Sara — Lifting</title>
@@ -21,15 +24,26 @@
     --good: #2E7D4F;
     --bad: #B3403A;
   }
-  * { box-sizing: border-box; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    overflow-x: hidden;
+    overscroll-behavior-y: contain;
+  }
   body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
     color: var(--text);
     max-width: 880px;
     margin: 0 auto;
-    padding: 24px 16px 100px;
+    padding: calc(16px + env(safe-area-inset-top)) calc(16px + env(safe-area-inset-right)) calc(100px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left));
     line-height: 1.5;
     background: #fafbfc;
+  }
+  button, .tab, .pill, select, a, summary, input {
+    touch-action: manipulation;
+  }
+  button, .tab, .pill, summary {
+    -webkit-user-select: none;
+    user-select: none;
   }
   h1 { color: var(--navy); font-size: 1.7rem; margin: 0 0 2px; }
   .subtitle { color: var(--muted); font-style: italic; margin: 0 0 10px; font-size: 0.9rem; }
@@ -62,7 +76,7 @@
   .login-card p { margin: 0 0 16px; font-size: 0.85rem; color: var(--muted); }
   .login-card label { display: block; font-size: 0.78rem; font-weight: 600; color: var(--navy); margin: 10px 0 3px; }
   .login-card input {
-    width: 100%; padding: 11px 12px; font-size: 1rem;
+    width: 100%; padding: 11px 12px; font-size: 16px;
     border: 1px solid var(--border); border-radius: 8px;
   }
   .login-card input:focus { outline: 2px solid var(--navy-light); }
@@ -99,7 +113,7 @@
   }
   .pool-chip.selected { background: var(--navy); color: #fff; border-color: var(--navy); }
 
-  .controls { position: sticky; top: 0; z-index: 5; background: #fafbfc; padding: 8px 0 12px; }
+  .controls { position: sticky; top: env(safe-area-inset-top, 0); z-index: 5; background: #fafbfc; padding: 8px 0 12px; }
   .tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
   .tab {
     flex: 1 1 auto; min-width: 62px; text-align: center;
@@ -124,7 +138,7 @@
   .pill.active { background: var(--navy); color: #fff; }
   select#count-select {
     padding: 6px 10px; border-radius: 999px; border: 1px solid var(--border);
-    font-size: 0.85rem; font-weight: 600; color: var(--navy); background: #fff;
+    font-size: 16px; font-weight: 600; color: var(--navy); background: #fff; /* 16px stops iOS auto-zoom */
   }
 
   .shuffle-row { display: flex; gap: 8px; margin: 10px 0 4px; }
@@ -167,8 +181,8 @@
   table.log th { text-align: left; font-weight: 600; color: var(--muted); padding: 4px 6px; font-size: 0.72rem; text-transform: uppercase; }
   table.log td { padding: 3px 6px; }
   table.log input {
-    width: 100%; max-width: 90px; padding: 7px 8px;
-    border: 1px solid var(--border); border-radius: 6px; font-size: 0.9rem;
+    width: 100%; max-width: 110px; padding: 9px 10px;
+    border: 1px solid var(--border); border-radius: 6px; font-size: 16px; /* 16px stops iOS auto-zoom on focus */
   }
   table.log input:focus { outline: 2px solid var(--navy-light); border-color: var(--navy-light); }
 
